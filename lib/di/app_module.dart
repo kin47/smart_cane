@@ -10,10 +10,6 @@ abstract class AppModule {
   @singleton
   Dio get dio => DioBuilder().getDio();
 
-  @Named('authDio')
-  @singleton
-  Dio get authDio => AuthDioBuilder().getDio();
-
   @singleton
   EventBus get eventBus => EventBus();
 

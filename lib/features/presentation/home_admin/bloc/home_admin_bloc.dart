@@ -53,29 +53,6 @@ class HomeAdminBloc extends BaseBloc<HomeAdminEvent, HomeAdminState> {
 
     await _initUserLocation();
     await _initAdminLocation();
-    await _getRoute();
-  }
-
-  Future<void> _getRoute() async {
-    PolylinePoints polylinePoints = PolylinePoints();
-    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      dotenv.get('GOOGLE_API_KEY'),
-      PointLatLng(
-        state.myLocation.latitude,
-        state.myLocation.longitude,
-      ),
-      PointLatLng(
-        state.blindPersonLocation.latitude,
-        state.blindPersonLocation.longitude,
-      ),
-    );
-    if (result.points.isNotEmpty) {
-      final points = result.points
-          .map((e) => LatLng(e.latitude, e.longitude))
-          .toList();
-    } else {
-      debugPrint('No route found');
-    }
   }
 
   Future<void> _initUserLocation() async {

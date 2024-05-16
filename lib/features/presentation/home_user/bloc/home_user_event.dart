@@ -11,5 +11,7 @@ class HomeUserEvent with _$HomeUserEvent {
     required DateTime time,
   }) = _SendLocation;
 
+  const factory HomeUserEvent.sendSms() = _SendSMS;
+
   const factory HomeUserEvent.signOut() = _SignOut;
 }

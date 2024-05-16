@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -6,10 +7,12 @@ import 'package:event_bus/event_bus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_cane/base/base_widget.dart';
 import 'package:smart_cane/base/bloc/bloc_status.dart';
-import 'package:smart_cane/common/constants/location_constants.dart';
 import 'package:smart_cane/common/index.dart';
+import 'package:smart_cane/common/mqtt/mqtt_app_state.dart';
+import 'package:smart_cane/common/mqtt/mqtt_manager.dart';
 import 'package:smart_cane/common/widgets/buttons/app_button.dart';
 import 'package:smart_cane/di/di_setup.dart';
 import 'package:smart_cane/features/domain/entity/user_entity.dart';
@@ -17,7 +20,7 @@ import 'package:smart_cane/features/domain/events/event_bus_event.dart';
 import 'package:smart_cane/features/presentation/home_user/bloc/home_user_bloc.dart';
 import 'package:smart_cane/gen/assets.gen.dart';
 import 'package:smart_cane/routes/app_pages.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 @RoutePage()
 class HomeUserPage extends StatefulWidget {
@@ -36,6 +39,8 @@ class _HomeUserPageState extends BaseState<HomeUserPage, HomeUserEvent,
     HomeUserState, HomeUserBloc> {
   late StreamSubscription _eventBusSubscription;
   late Timer _timer;
+  late MQTTAppState currentAppState;
+  late MQTTManager manager;
 
   @override
   void initState() {
@@ -58,6 +63,10 @@ class _HomeUserPageState extends BaseState<HomeUserPage, HomeUserEvent,
         );
       },
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(seconds: 2));
+      _configureAndConnect();
+    });
   }
 
   @override
@@ -65,6 +74,36 @@ class _HomeUserPageState extends BaseState<HomeUserPage, HomeUserEvent,
     super.dispose();
     _eventBusSubscription.cancel();
     _timer.cancel();
+  }
+
+  void _configureAndConnect() {
+    // ignore: flutter_style_todos
+    // TODO: Use UUID
+    String osPrefix = 'Flutter_iOS';
+    if (Platform.isAndroid) {
+      osPrefix = 'Flutter_Android';
+    }
+    manager = MQTTManager(
+      host: dotenv.get('MQTT_HOST'),
+      topic: dotenv.get('MQTT_TOPIC'),
+      identifier: osPrefix,
+      state: currentAppState,
+    );
+    manager.initializeMQTTClient();
+    manager.connect();
+  }
+
+  void _disconnect() {
+    manager.disconnect();
+  }
+
+  void _publishMessage(String text) {
+    String osPrefix = 'Flutter_iOS';
+    if (Platform.isAndroid) {
+      osPrefix = 'Flutter_Android';
+    }
+    final String message = '$osPrefix says: $text';
+    manager.publish(message);
   }
 
   @override
@@ -88,8 +127,38 @@ class _HomeUserPageState extends BaseState<HomeUserPage, HomeUserEvent,
     }
   }
 
+  Future<void> listenToMQTT(String text) async {
+    String getMQTTMessage = text.substring(text.length - 1);
+    print('MQTT message: $getMQTTMessage');
+    switch (getMQTTMessage) {
+      case '0':
+        bloc.add(
+          HomeUserEvent.sendLocation(
+            isPressSend: false,
+            time: DateTime.now(),
+          ),
+        );
+        break;
+      case '1':
+        bloc.add(const HomeUserEvent.sendSms());
+        break;
+      case '2':
+        await FlutterPhoneDirectCaller.callNumber(widget.user.phoneNumber);
+        break;
+      default:
+        break;
+    }
+  }
+
   @override
   Widget renderUI(BuildContext context) {
+    final MQTTAppState appState = Provider.of<MQTTAppState>(context);
+    // Keep a reference to the app state.
+    currentAppState = appState;
+    print('Current state is $currentAppState');
+    if (currentAppState.getHistoryText.isNotEmpty) {
+      listenToMQTT(currentAppState.getHistoryText);
+    }
     return BaseScaffold(
       appBar: BaseAppBar(
         title: 'home'.tr(),
@@ -205,13 +274,6 @@ class _HomeUserPageState extends BaseState<HomeUserPage, HomeUserEvent,
       backgroundColor: AppColors.green,
       height: 56.h,
       borderRadius: 28.r,
-      trailingIcon: Assets.svg.icPhone.svg(
-        width: 24.w,
-        colorFilter: const ColorFilter.mode(
-          AppColors.white,
-          BlendMode.srcIn,
-        ),
-      ),
       onPressed: () async {
         await FlutterPhoneDirectCaller.callNumber(widget.user.phoneNumber);
       },
@@ -231,8 +293,12 @@ class _HomeUserPageState extends BaseState<HomeUserPage, HomeUserEvent,
                 ),
               ),
             ),
-            Assets.svg.icGoogleMap.svg(
+            Assets.svg.icPhone.svg(
               width: 24.w,
+              colorFilter: const ColorFilter.mode(
+                AppColors.white,
+                BlendMode.srcIn,
+              ),
             ),
           ],
         ),

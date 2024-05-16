@@ -1,18 +1,22 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:injectable/injectable.dart';
 import 'package:smart_cane/base/bloc/base_bloc.dart';
 import 'package:smart_cane/base/bloc/base_bloc_state.dart';
 import 'package:smart_cane/base/bloc/bloc_status.dart';
 import 'package:smart_cane/base/network/errors/extension.dart';
+import 'package:smart_cane/common/constants/string_constants.dart';
 import 'package:smart_cane/features/domain/entity/user_entity.dart';
 import 'package:smart_cane/features/domain/repository/auth_repository.dart';
 import 'package:smart_cane/features/domain/repository/location_repository.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:smart_cane/features/domain/repository/sms_repository.dart';
 
 part 'home_user_event.dart';
 
@@ -27,12 +31,14 @@ class HomeUserBloc extends BaseBloc<HomeUserEvent, HomeUserState> {
   HomeUserBloc(
     this._authRepository,
     this._locationRepository,
+    this._smsRepository,
   ) : super(HomeUserState.init()) {
     on<HomeUserEvent>((event, emit) async {
       await event.when(
         init: (userEntity) => init(emit, userEntity),
         sendLocation: (isPressSend, time) =>
             sendLocation(emit, isPressSend, time),
+        sendSms: () => sendSms(emit),
         signOut: () => signOut(emit),
       );
     });
@@ -40,6 +46,7 @@ class HomeUserBloc extends BaseBloc<HomeUserEvent, HomeUserState> {
 
   final AuthRepository _authRepository;
   final LocationRepository _locationRepository;
+  final SmsRepository _smsRepository;
 
   Future init(Emitter<HomeUserState> emit, UserEntity userEntity) async {
     emit(
@@ -48,6 +55,10 @@ class HomeUserBloc extends BaseBloc<HomeUserEvent, HomeUserState> {
         status: BaseStateStatus.idle,
       ),
     );
+    String osPrefix = 'Flutter_iOS';
+    if (Platform.isAndroid) {
+      osPrefix = 'Flutter_Android';
+    }
   }
 
   Future sendLocation(
@@ -89,6 +100,33 @@ class HomeUserBloc extends BaseBloc<HomeUserEvent, HomeUserState> {
           );
         }
       },
+    );
+  }
+
+  Future sendSms(Emitter<HomeUserState> emit) async {
+    final Position position = await _determinePosition();
+
+    // get address
+    List<Placemark> placemarks = await placemarkFromCoordinates(
+      position.latitude,
+      position.longitude,
+    );
+    String address =
+        '${placemarks.first.street}, ${placemarks.first.subAdministrativeArea}, ${placemarks.first.administrativeArea}';
+    final res = await _smsRepository.sendSMSMessage(
+      message: StringConstants.getSmsMessage(address, position),
+      phoneNumber: StringConstants.getPhoneNumberVN(
+        state.userEntity?.phoneNumber ?? "",
+      ),
+    );
+    res.fold(
+      (l) => emit(state.copyWith(
+        message: "send_sms_failed".tr(),
+        status: BaseStateStatus.failed,
+      )),
+      (r) => emit(state.copyWith(
+        status: BaseStateStatus.idle,
+      )),
     );
   }
 

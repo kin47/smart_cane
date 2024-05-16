@@ -11,7 +11,6 @@ import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:smart_cane/base/base_widget.dart';
 import 'package:smart_cane/base/bloc/bloc_status.dart';
-import 'package:smart_cane/common/constants/location_constants.dart';
 import 'package:smart_cane/common/index.dart';
 import 'package:smart_cane/common/widgets/buttons/app_button.dart';
 import 'package:smart_cane/di/di_setup.dart';

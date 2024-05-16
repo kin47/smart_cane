@@ -38,10 +38,3 @@ class DioBuilder {
     return dotenv.get('BASE_URL');
   }
 }
-
-class AuthDioBuilder extends DioBuilder {
-  @override
-  String getUrl() {
-    return dotenv.get('BASE_AUTH_URL');
-  }
-}

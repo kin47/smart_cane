@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_cane/common/constants/other_constants.dart';
 import 'package:smart_cane/common/utils/dialog/loading_widget.dart';
 import 'package:smart_cane/di/di_setup.dart';
@@ -10,6 +11,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'common/config/screen_utils_config.dart';
+import 'common/mqtt/mqtt_app_state.dart';
 import 'firebase_options.dart';
 import 'routes/app_pages.dart';
 
@@ -85,7 +87,10 @@ class MyApp extends StatelessWidget {
               data: MediaQuery.of(context).copyWith(
                 textScaler: const TextScaler.linear(1),
               ),
-              child: child ?? const SizedBox(),
+              child: ChangeNotifierProvider<MQTTAppState>(
+                create: (_) => MQTTAppState(),
+                child: child ?? const SizedBox(),
+              ),
             ),
           ),
           routeInformationParser: _appRoute.defaultRouteParser(),
